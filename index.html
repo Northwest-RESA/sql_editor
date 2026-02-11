@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SQL Editor — SQL Academy 101</title>
+
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- CodeMirror 6 via CDN for SQL syntax highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/dracula.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/sql/sql.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/matchbrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/closebrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/hint/show-hint.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/hint/sql-hint.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/hint/show-hint.min.css">
+
+  <style>
+    /* ========================================
+       CSS VARIABLES — matches course site
+       ======================================== */
+    :root {
+      --bg-deep:        #0d1117;
+      --bg-surface:     #161b22;
+      --bg-panel:       #1c2129;
+      --bg-elevated:    #21262d;
+      --border-subtle:  #30363d;
+      --border-default: #3d444d;
+      --text-primary:   #e6edf3;
+      --text-secondary: #8b949e;
+      --text-muted:     #6e7681;
+      --accent:         #2f81f7;
+      --accent-hover:   #388bfd;
+      --accent-muted:   rgba(47,129,247,0.15);
+      --green:          #3fb950;
+      --green-muted:    rgba(63,185,80,0.15);
+      --red:            #f85149;
+      --red-muted:      rgba(248,81,73,0.15);
+      --yellow:         #d29922;
+      --yellow-muted:   rgba(210,153,34,0.15);
+      --orange:         #db6d28;
+      --purple:         #a371f7;
+      --font-mono:      'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+      --font-sans:      -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      --radius:         8px;
+      --radius-sm:      6px;
+      --shadow:         0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    /* ========================================
+       RESET & BASE
+       ======================================== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: var(--font-sans);
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      overflow: hidden;
+    }
+
+    /* ========================================
+       LAYOUT — full viewport, split panes
+       ======================================== */
+    .app {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      height: 100vh;
+    }
+
+    /* ---- Header ---- */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      height: 52px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-subtle);
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-mark {
+      width: 28px; height: 28px;
+      background: var(--accent);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 14px;
+      color: #fff;
+      font-family: var(--font-mono);
+    }
+
+    .header h1 {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .header h1 span {
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      transition: background 0.3s;
+    }
+    .status-dot.connected { background: var(--green); box-shadow: 0 0 6px rgba(63,185,80,0.5); }
+    .status-dot.error     { background: var(--red);   box-shadow: 0 0 6px rgba(248,81,73,0.4); }
+
+    .status-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+    }
+
+    .back-link {
+      font-size: 12px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      padding: 4px 10px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      transition: all 0.15s;
+    }
+    .back-link:hover {
+      color: var(--text-primary);
+      border-color: var(--border-default);
+      background: var(--bg-elevated);
+    }
+
+    /* ---- Main (split panes) ---- */
+    .main {
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ---- Editor Pane ---- */
+    .editor-pane {
+      display: flex;
+      flex-direction: column;
+      border-bottom: 2px solid var(--border-subtle);
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .pane-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      height: 40px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border-subtle);
+      flex-shrink: 0;
+    }
+
+    .pane-toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pane-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+    }
+
+    .query-tabs {
+      display: flex;
+      gap: 2px;
+    }
+
+    .query-tab {
+      font-size: 12px;
+      padding: 4px 12px;
+      background: transparent;
+      color: var(--text-secondary);
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-family: var(--font-mono);
+      transition: all 0.15s;
+    }
+    .query-tab:hover { background: var(--bg-elevated); color: var(--text-primary); }
+    .query-tab.active {
+      background: var(--accent-muted);
+      color: var(--accent);
+    }
+
+    .pane-toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 14px;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-family: var(--font-sans);
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-run {
+      background: var(--green);
+      color: #fff;
+    }
+    .btn-run:hover { background: #46c35a; }
+    .btn-run:active { transform: scale(0.97); }
+    .btn-run:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .btn-run:disabled:hover { background: var(--green); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border-subtle);
+    }
+    .btn-ghost:hover {
+      color: var(--text-primary);
+      border-color: var(--border-default);
+      background: var(--bg-elevated);
+    }
+
+    .kbd {
+      font-size: 10px;
+      padding: 1px 5px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 3px;
+      background: var(--bg-deep);
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      margin-left: 4px;
+    }
+
+    .editor-wrap {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* CodeMirror overrides */
+    .CodeMirror {
+      height: 100% !important;
+      font-family: var(--font-mono) !important;
+      font-size: 14px !important;
+      line-height: 1.6 !important;
+      background: var(--bg-deep) !important;
+      padding: 8px 0;
+    }
+
+    .CodeMirror-gutters {
+      background: var(--bg-deep) !important;
+      border-right: 1px solid var(--border-subtle) !important;
+    }
+
+    .CodeMirror-linenumber {
+      color: var(--text-muted) !important;
+      font-size: 12px !important;
+      padding: 0 8px 0 12px !important;
+    }
+
+    .CodeMirror-cursor {
+      border-left-color: var(--accent) !important;
+      border-left-width: 2px !important;
+    }
+
+    .CodeMirror-selected {
+      background: var(--accent-muted) !important;
+    }
+
+    .CodeMirror-focused .CodeMirror-selected {
+      background: rgba(47,129,247,0.25) !important;
+    }
+
+    /* SQL syntax colors — Dracula-inspired */
+    .cm-s-dracula .cm-keyword   { color: #ff79c6 !important; font-weight: 600; }
+    .cm-s-dracula .cm-number    { color: #bd93f9 !important; }
+    .cm-s-dracula .cm-string    { color: #f1fa8c !important; }
+    .cm-s-dracula .cm-comment   { color: var(--text-muted) !important; font-style: italic; }
+    .cm-s-dracula .cm-builtin   { color: #8be9fd !important; }
+    .cm-s-dracula .cm-def       { color: #50fa7b !important; }
+    .cm-s-dracula .cm-variable  { color: var(--text-primary) !important; }
+    .cm-s-dracula .cm-operator  { color: #ff79c6 !important; }
+    .cm-s-dracula .cm-bracket   { color: var(--text-secondary) !important; }
+
+    /* Autocomplete dropdown */
+    .CodeMirror-hints {
+      background: var(--bg-panel) !important;
+      border: 1px solid var(--border-default) !important;
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow);
+      font-family: var(--font-mono) !important;
+      font-size: 13px !important;
+    }
+    .CodeMirror-hint {
+      color: var(--text-primary) !important;
+      padding: 4px 10px !important;
+    }
+    .CodeMirror-hint-active {
+      background: var(--accent-muted) !important;
+      color: var(--accent) !important;
+    }
+
+    /* ---- Results Pane ---- */
+    .results-pane {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .results-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      height: 40px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border-subtle);
+      flex-shrink: 0;
+    }
+
+    .results-meta {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .results-meta .count {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .results-meta .timing {
+      color: var(--text-muted);
+    }
+
+    .results-body {
+      flex: 1;
+      overflow: auto;
+      position: relative;
+    }
+
+    /* Empty / Error / Loading states */
+    .state-message {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 12px;
+      color: var(--text-secondary);
+      padding: 40px;
+      text-align: center;
+    }
+
+    .state-message .icon {
+      font-size: 40px;
+      opacity: 0.4;
+    }
+
+    .state-message h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .state-message p {
+      font-size: 13px;
+      max-width: 400px;
+      line-height: 1.5;
+    }
+
+    .state-message.error h3 { color: var(--red); }
+    .state-message.error .icon { color: var(--red); opacity: 0.7; }
+
+    .state-message pre.error-detail {
+      background: var(--red-muted);
+      color: var(--red);
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      max-width: 600px;
+      width: 100%;
+      text-align: left;
+      white-space: pre-wrap;
+      word-break: break-word;
+      border: 1px solid rgba(248,81,73,0.2);
+    }
+
+    /* Loading spinner */
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--border-subtle);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ---- Results Table ---- */
+    .results-table-wrap {
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+    }
+
+    .results-table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      font-family: var(--font-mono);
+    }
+
+    .results-table thead {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    .results-table th {
+      background: var(--bg-elevated);
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 8px 16px;
+      text-align: left;
+      white-space: nowrap;
+      border-bottom: 2px solid var(--border-subtle);
+      user-select: none;
+    }
+
+    .results-table td {
+      padding: 6px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      white-space: nowrap;
+      max-width: 400px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text-primary);
+    }
+
+    .results-table tbody tr {
+      transition: background 0.1s;
+    }
+
+    .results-table tbody tr:hover {
+      background: var(--accent-muted);
+    }
+
+    .results-table tbody tr:nth-child(even) {
+      background: rgba(255,255,255,0.015);
+    }
+
+    .results-table tbody tr:nth-child(even):hover {
+      background: var(--accent-muted);
+    }
+
+    .results-table td.null-val {
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .results-table td.num-val {
+      color: var(--purple);
+      text-align: right;
+    }
+
+    /* ---- Resize Handle ---- */
+    .resize-handle {
+      position: absolute;
+      left: 0; right: 0;
+      height: 6px;
+      cursor: row-resize;
+      z-index: 10;
+      background: transparent;
+      transition: background 0.15s;
+    }
+    .resize-handle:hover,
+    .resize-handle.active {
+      background: var(--accent);
+    }
+
+    /* ---- Starter Queries Drawer ---- */
+    .drawer-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+    }
+    .drawer-overlay.open { display: block; }
+
+    .drawer {
+      position: fixed;
+      top: 0; right: -420px;
+      width: 400px;
+      height: 100%;
+      background: var(--bg-surface);
+      border-left: 1px solid var(--border-subtle);
+      z-index: 101;
+      transition: right 0.25s ease;
+      display: flex;
+      flex-direction: column;
+      box-shadow: -4px 0 24px rgba(0,0,0,0.4);
+    }
+    .drawer.open { right: 0; }
+
+    .drawer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .drawer-header h2 {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .drawer-close {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 20px;
+      padding: 4px;
+      line-height: 1;
+    }
+    .drawer-close:hover { color: var(--text-primary); }
+
+    .drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+    }
+
+    .starter-group {
+      margin-bottom: 24px;
+    }
+
+    .starter-group h3 {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .starter-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .starter-item:hover {
+      border-color: var(--accent);
+      background: var(--accent-muted);
+    }
+
+    .starter-item .starter-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .starter-item .starter-sql {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ---- Export button ---- */
+    .btn-export {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border-subtle);
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-family: var(--font-mono);
+      transition: all 0.15s;
+    }
+    .btn-export:hover {
+      color: var(--text-primary);
+      border-color: var(--border-default);
+      background: var(--bg-elevated);
+    }
+    .btn-export:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    /* ---- Responsive ---- */
+    @media (max-width: 768px) {
+      .header h1 span { display: none; }
+      .kbd { display: none; }
+      .drawer { width: 320px; }
+    }
+
+    /* ---- Config banner ---- */
+    .config-banner {
+      background: var(--yellow-muted);
+      border-bottom: 1px solid rgba(210,153,34,0.3);
+      padding: 10px 20px;
+      font-size: 13px;
+      color: var(--yellow);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .config-banner a {
+      color: var(--yellow);
+      text-decoration: underline;
+    }
+    .config-banner code {
+      background: rgba(210,153,34,0.15);
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .config-banner.hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+
+    <!-- Config warning (shown if keys not set) -->
+    <div class="config-banner hidden" id="configBanner">
+      ⚠️ Supabase connection not configured. Set your <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code> in the script below.
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo-mark">S</div>
+        <h1>SQL Editor <span>— SQL Academy 101</span></h1>
+      </div>
+      <div class="header-right">
+        <div class="status-dot" id="statusDot"></div>
+        <span class="status-label" id="statusLabel">Connecting…</span>
+        <a href="index.html" class="back-link">← Course Home</a>
+      </div>
+    </header>
+
+    <!-- Main split view -->
+    <div class="main" id="mainArea">
+
+      <!-- Editor -->
+      <div class="editor-pane" id="editorPane">
+        <div class="pane-toolbar">
+          <div class="pane-toolbar-left">
+            <span class="pane-label">Query</span>
+            <div class="query-tabs" id="queryTabs">
+              <!-- tabs populated by JS -->
+            </div>
+          </div>
+          <div class="pane-toolbar-right">
+            <button class="btn btn-ghost" onclick="openDrawer()" title="Starter queries">
+              📋 Starters
+            </button>
+            <button class="btn btn-ghost" onclick="clearEditor()" title="Clear editor">
+              Clear
+            </button>
+            <button class="btn btn-run" id="runBtn" onclick="executeQuery()" title="Run query">
+              ▶ Run <span class="kbd">Ctrl+Enter</span>
+            </button>
+          </div>
+        </div>
+        <div class="editor-wrap">
+          <textarea id="sqlInput"></textarea>
+        </div>
+      </div>
+
+      <!-- Resize handle -->
+      <div class="resize-handle" id="resizeHandle"></div>
+
+      <!-- Results -->
+      <div class="results-pane" id="resultsPane">
+        <div class="results-toolbar">
+          <div class="results-meta" id="resultsMeta">
+            <span class="pane-label">Results</span>
+          </div>
+          <button class="btn-export" id="exportBtn" onclick="exportCSV()" disabled>
+            ⬇ Export CSV
+          </button>
+        </div>
+        <div class="results-body" id="resultsBody">
+          <div class="state-message">
+            <div class="icon">⌨️</div>
+            <h3>Write a query to get started</h3>
+            <p>Type a <strong>SELECT</strong> statement above and press <strong>Ctrl+Enter</strong> (or click Run) to see results. Try the Starters button for example queries.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Starter Queries Drawer -->
+  <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+  <div class="drawer" id="drawer">
+    <div class="drawer-header">
+      <h2>Starter Queries</h2>
+      <button class="drawer-close" onclick="closeDrawer()">✕</button>
+    </div>
+    <div class="drawer-body" id="drawerBody">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+
+  <script>
+    // ================================================================
+    // CONFIGURATION — UPDATE THESE TWO VALUES
+    // ================================================================
+    // Find your anon key at: Project Settings → API → Project API keys
+    // Your project URL is: https://<project-id>.supabase.co
+    // ================================================================
+    const SUPABASE_URL      = 'https://elxhuyqhjnweatrpviqn.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_btaj9wx3uT01AsePLEnCRg_O-vQ8s22';  // Publishable key
+    // ================================================================
+
+    // ---- Supabase client ----
+    let db = null;
+    let isConnected = false;
+    let lastResults = [];
+
+    function initSupabase() {
+      if (SUPABASE_ANON_KEY === 'YOUR_ANON_KEY_HERE') {
+        document.getElementById('configBanner').classList.remove('hidden');
+        setStatus('error', 'Not configured');
+        return;
+      }
+      try {
+        const { createClient } = window.supabase;
+        db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        testConnection();
+      } catch (e) {
+        setStatus('error', 'Init failed');
+        console.error('Supabase init error:', e);
+      }
+    }
+
+    async function testConnection() {
+      try {
+        const { data, error } = await db.rpc('execute_sql', {
+          query: "select 1 as connected"
+        });
+        if (error) throw error;
+        isConnected = true;
+        setStatus('connected', 'Connected');
+      } catch (e) {
+        setStatus('error', 'Disconnected');
+        console.error('Connection test failed:', e);
+      }
+    }
+
+    function setStatus(state, label) {
+      const dot = document.getElementById('statusDot');
+      const lbl = document.getElementById('statusLabel');
+      dot.className = 'status-dot ' + state;
+      lbl.textContent = label;
+    }
+
+    // ---- CodeMirror Editor ----
+    let editor;
+
+    function initEditor() {
+      editor = CodeMirror.fromTextArea(document.getElementById('sqlInput'), {
+        mode: 'text/x-pgsql',
+        theme: 'dracula',
+        lineNumbers: true,
+        matchBrackets: true,
+        autoCloseBrackets: true,
+        indentWithTabs: false,
+        tabSize: 2,
+        indentUnit: 2,
+        lineWrapping: true,
+        placeholder: '-- Write your SQL query here...\nSELECT * FROM schools;',
+        extraKeys: {
+          'Ctrl-Enter': executeQuery,
+          'Cmd-Enter': executeQuery,
+          'Ctrl-Space': 'autocomplete',
+        },
+        hintOptions: {
+          tables: {
+            schools:          ['school_id', 'school_name', 'school_type', 'address', 'city', 'state', 'zip_code', 'phone', 'principal_name'],
+            schoolyears:      ['schoolyear_id', 'start_date', 'end_date', 'schoolyear_name'],
+            students:         ['student_id', 'first_name', 'last_name', 'date_of_birth', 'gender', 'parent_name', 'parent_email', 'parent_phone'],
+            enrollments:      ['enrollment_id', 'student_id', 'school_id', 'schoolyear_id', 'grade_level', 'entry_date', 'exit_date'],
+            teachers:         ['teacher_id', 'first_name', 'last_name', 'email', 'phone', 'hire_date', 'department'],
+            teacher_school:   ['teacherschool_id', 'teacher_id', 'school_id', 'schoolyear_id'],
+            terms:            ['term_id', 'school_id', 'schoolyear_id', 'term_name', 'term_code', 'term_start', 'term_end'],
+            courses:          ['course_id', 'subject_code', 'subject_name', 'discipline_code', 'discipline_name', 'grade_level_min', 'grade_level_max', 'course_code', 'course_name', 'credits'],
+            sections:         ['section_id', 'course_id', 'school_id', 'term_id', 'teacher_id', 'section_number', 'grade_level', 'period', 'room_number', 'max_enrollment'],
+            student_sections: ['studentsection_id', 'student_id', 'section_id', 'enrollment_date', 'grade'],
+          }
+        }
+      });
+
+      // Set initial content
+      editor.setValue('-- Welcome to SQL Academy 101!\n-- Try: SELECT * FROM schools;\n\n');
+      editor.setCursor({ line: 3, ch: 0 });
+      editor.focus();
+    }
+
+    function clearEditor() {
+      editor.setValue('');
+      editor.focus();
+    }
+
+    // ---- Query Execution ----
+    async function executeQuery() {
+      const sql = editor.getValue().trim();
+      if (!sql) return;
+
+      if (!db) {
+        showError('Supabase is not configured. Please set your SUPABASE_URL and SUPABASE_ANON_KEY.');
+        return;
+      }
+
+      const runBtn = document.getElementById('runBtn');
+      runBtn.disabled = true;
+      showLoading();
+
+      const startTime = performance.now();
+
+      try {
+        const { data, error } = await db.rpc('execute_sql', { query: sql });
+
+        const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+
+        if (error) {
+          showError(error.message || JSON.stringify(error), elapsed);
+          return;
+        }
+
+        lastResults = Array.isArray(data) ? data : [];
+        showResults(lastResults, elapsed);
+      } catch (e) {
+        const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+        showError(e.message || 'Unknown error', elapsed);
+      } finally {
+        runBtn.disabled = false;
+      }
+    }
+
+    // ---- Results rendering ----
+    function showLoading() {
+      const body = document.getElementById('resultsBody');
+      body.innerHTML = `
+        <div class="state-message">
+          <div class="spinner"></div>
+          <p>Executing query…</p>
+        </div>
+      `;
+      document.getElementById('resultsMeta').innerHTML = '<span class="pane-label">Results</span>';
+      document.getElementById('exportBtn').disabled = true;
+    }
+
+    function showError(message, elapsed) {
+      const body = document.getElementById('resultsBody');
+      body.innerHTML = `
+        <div class="state-message error">
+          <div class="icon">✕</div>
+          <h3>Query Error</h3>
+          <pre class="error-detail">${escapeHtml(message)}</pre>
+        </div>
+      `;
+      const meta = document.getElementById('resultsMeta');
+      meta.innerHTML = `
+        <span class="pane-label">Results</span>
+        <span style="color:var(--red)">Error</span>
+        ${elapsed ? `<span class="timing">${elapsed}s</span>` : ''}
+      `;
+      document.getElementById('exportBtn').disabled = true;
+    }
+
+    function showResults(data, elapsed) {
+      const meta = document.getElementById('resultsMeta');
+      const body = document.getElementById('resultsBody');
+      const exportBtn = document.getElementById('exportBtn');
+
+      if (!data || data.length === 0) {
+        body.innerHTML = `
+          <div class="state-message">
+            <div class="icon">📭</div>
+            <h3>No rows returned</h3>
+            <p>The query executed successfully but returned no data.</p>
+          </div>
+        `;
+        meta.innerHTML = `
+          <span class="pane-label">Results</span>
+          <span class="count">0 rows</span>
+          <span class="timing">${elapsed}s</span>
+        `;
+        exportBtn.disabled = true;
+        return;
+      }
+
+      const columns = Object.keys(data[0]);
+      const rowCount = data.length;
+
+      meta.innerHTML = `
+        <span class="pane-label">Results</span>
+        <span class="count">${rowCount.toLocaleString()} row${rowCount !== 1 ? 's' : ''}</span>
+        <span>×</span>
+        <span>${columns.length} col${columns.length !== 1 ? 's' : ''}</span>
+        <span class="timing">${elapsed}s</span>
+      `;
+
+      let html = '<div class="results-table-wrap"><table class="results-table"><thead><tr>';
+      html += '<th style="color:var(--text-muted);font-style:italic">#</th>';
+      for (const col of columns) {
+        html += `<th>${escapeHtml(col)}</th>`;
+      }
+      html += '</tr></thead><tbody>';
+
+      for (let i = 0; i < rowCount; i++) {
+        html += '<tr>';
+        html += `<td style="color:var(--text-muted)">${i + 1}</td>`;
+        for (const col of columns) {
+          const val = data[i][col];
+          if (val === null || val === undefined) {
+            html += '<td class="null-val">NULL</td>';
+          } else if (typeof val === 'number') {
+            html += `<td class="num-val">${val}</td>`;
+          } else {
+            html += `<td>${escapeHtml(String(val))}</td>`;
+          }
+        }
+        html += '</tr>';
+      }
+
+      html += '</tbody></table></div>';
+      body.innerHTML = html;
+      exportBtn.disabled = false;
+    }
+
+    // ---- CSV Export ----
+    function exportCSV() {
+      if (!lastResults || lastResults.length === 0) return;
+
+      const columns = Object.keys(lastResults[0]);
+      let csv = columns.map(c => `"${c}"`).join(',') + '\n';
+
+      for (const row of lastResults) {
+        csv += columns.map(c => {
+          const val = row[c];
+          if (val === null || val === undefined) return '';
+          const str = String(val).replace(/"/g, '""');
+          return `"${str}"`;
+        }).join(',') + '\n';
+      }
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `query_results_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // ---- Starter Queries ----
+    const starterQueries = [
+      {
+        group: 'Module 2 — Basic SELECT',
+        queries: [
+          { title: 'View all schools', sql: 'SELECT *\nFROM schools;' },
+          { title: 'Student names and DOB', sql: 'SELECT\n  first_name\n  , last_name\n  , date_of_birth\nFROM students;' },
+          { title: 'Course catalog', sql: 'SELECT\n  course_code\n  , course_name\n  , subject_name\nFROM courses\nORDER BY course_name;' },
+          { title: 'Teacher directory', sql: 'SELECT\n  first_name || \' \' || last_name AS teacher_name\n  , email\n  , department\nFROM teachers;' },
+        ]
+      },
+      {
+        group: 'Module 3 — Filtering & Sorting',
+        queries: [
+          { title: 'Grade 9 students', sql: 'SELECT\n  s.first_name\n  , s.last_name\n  , e.grade_level\nFROM enrollments e\nJOIN students s ON e.student_id = s.student_id\nWHERE e.grade_level = 9\n  AND e.schoolyear_id = 2026\nORDER BY s.last_name;' },
+          { title: 'Math courses', sql: 'SELECT\n  course_name\n  , course_code\nFROM courses\nWHERE course_name LIKE \'%Math%\'\nORDER BY course_name;' },
+          { title: 'Last names starting with S', sql: 'SELECT\n  first_name\n  , last_name\nFROM students\nWHERE last_name LIKE \'S%\'\nORDER BY last_name, first_name;' },
+        ]
+      },
+      {
+        group: 'Module 4 — Aggregates',
+        queries: [
+          { title: 'Count all students', sql: 'SELECT COUNT(*) AS total_students\nFROM students;' },
+          { title: 'Students per school (current year)', sql: 'SELECT\n  sc.school_name\n  , COUNT(e.student_id) AS student_count\nFROM enrollments e\nJOIN schools sc ON e.school_id = sc.school_id\nWHERE e.schoolyear_id = 2026\n  AND e.exit_date IS NULL\nGROUP BY sc.school_name\nORDER BY student_count DESC;' },
+          { title: 'Grade distribution', sql: 'SELECT\n  grade_level\n  , COUNT(*) AS student_count\nFROM enrollments\nWHERE schoolyear_id = 2026\n  AND exit_date IS NULL\nGROUP BY grade_level\nORDER BY grade_level;' },
+        ]
+      },
+      {
+        group: 'Module 6–7 — JOINs',
+        queries: [
+          { title: 'Teacher schedule', sql: 'SELECT\n  sec.period\n  , c.course_name\n  , sec.grade_level\n  , sec.room_number\n  , COUNT(ss.student_id) AS enrollment\nFROM sections sec\nJOIN courses c ON sec.course_id = c.course_id\nLEFT JOIN student_sections ss ON sec.section_id = ss.section_id\nJOIN terms t ON sec.term_id = t.term_id\nWHERE sec.teacher_id = 702\n  AND t.schoolyear_id = 2026\nGROUP BY sec.period, c.course_name, sec.grade_level, sec.room_number\nORDER BY sec.period;' },
+          { title: 'Student roster for a section', sql: 'SELECT\n  st.student_id\n  , st.last_name\n  , st.first_name\n  , ss.grade\nFROM student_sections ss\nJOIN students st ON ss.student_id = st.student_id\nWHERE ss.section_id = 150\nORDER BY st.last_name, st.first_name;' },
+          { title: 'Courses with no sections', sql: 'SELECT\n  c.course_name\n  , c.course_code\nFROM courses c\nLEFT JOIN sections sec ON c.course_id = sec.course_id\nWHERE sec.section_id IS NULL\nORDER BY c.course_name;' },
+        ]
+      },
+      {
+        group: 'Explore the Schema',
+        queries: [
+          { title: 'List all tables', sql: "SELECT\n  table_name\n  , table_type\nFROM information_schema.tables\nWHERE table_schema = 'public'\nORDER BY table_name;" },
+          { title: 'Columns in a table', sql: "SELECT\n  column_name\n  , data_type\n  , is_nullable\nFROM information_schema.columns\nWHERE table_schema = 'public'\n  AND table_name = 'students'\nORDER BY ordinal_position;" },
+        ]
+      }
+    ];
+
+    function populateDrawer() {
+      const body = document.getElementById('drawerBody');
+      let html = '';
+      for (const group of starterQueries) {
+        html += `<div class="starter-group"><h3>${group.group}</h3>`;
+        for (const q of group.queries) {
+          const preview = q.sql.replace(/\n/g, ' ').substring(0, 60) + (q.sql.length > 60 ? '…' : '');
+          html += `
+            <button class="starter-item" onclick="loadStarter(${JSON.stringify(q.sql).replace(/"/g, '&quot;')})">
+              <div class="starter-title">${q.title}</div>
+              <div class="starter-sql">${escapeHtml(preview)}</div>
+            </button>`;
+        }
+        html += '</div>';
+      }
+      body.innerHTML = html;
+    }
+
+    function loadStarter(sql) {
+      editor.setValue(sql);
+      closeDrawer();
+      editor.focus();
+    }
+
+    function openDrawer() {
+      document.getElementById('drawerOverlay').classList.add('open');
+      document.getElementById('drawer').classList.add('open');
+    }
+
+    function closeDrawer() {
+      document.getElementById('drawerOverlay').classList.remove('open');
+      document.getElementById('drawer').classList.remove('open');
+    }
+
+    // ---- Resize Handle ----
+    function initResize() {
+      const handle = document.getElementById('resizeHandle');
+      const main = document.getElementById('mainArea');
+      const editorPane = document.getElementById('editorPane');
+      const resultsPane = document.getElementById('resultsPane');
+      let isResizing = false;
+
+      handle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        handle.classList.add('active');
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        const mainRect = main.getBoundingClientRect();
+        const pct = ((e.clientY - mainRect.top) / mainRect.height) * 100;
+        const clamped = Math.max(20, Math.min(80, pct));
+        main.style.gridTemplateRows = `${clamped}% ${100 - clamped}%`;
+
+        // Position the handle
+        handle.style.top = `${clamped}%`;
+        handle.style.transform = 'translateY(-50%)';
+      });
+
+      document.addEventListener('mouseup', () => {
+        if (!isResizing) return;
+        isResizing = false;
+        handle.classList.remove('active');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        editor.refresh();
+      });
+    }
+
+    // ---- Utilities ----
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // ---- History (session-only) ----
+    let queryHistory = [];
+
+    const origExecute = executeQuery;
+    executeQuery = async function() {
+      const sql = editor.getValue().trim();
+      if (sql && (queryHistory.length === 0 || queryHistory[queryHistory.length - 1] !== sql)) {
+        queryHistory.push(sql);
+        if (queryHistory.length > 50) queryHistory.shift();
+      }
+      return origExecute();
+    };
+
+    // ---- Keyboard shortcuts ----
+    document.addEventListener('keydown', (e) => {
+      // Escape closes drawer
+      if (e.key === 'Escape') closeDrawer();
+    });
+
+    // ---- Init ----
+    document.addEventListener('DOMContentLoaded', () => {
+      initEditor();
+      initSupabase();
+      populateDrawer();
+      initResize();
+    });
+  </script>
+</body>
+</html>
