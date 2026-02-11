@@ -875,6 +875,9 @@
             </div>
           </div>
           <div class="pane-toolbar-right">
+            <button class="btn btn-ghost" onclick="openHistoryDrawer()" title="Query history">
+              🕘 History
+            </button>
             <button class="btn btn-ghost" onclick="openDrawer()" title="Starter queries">
               📋 Starters
             </button>
@@ -1001,6 +1004,21 @@
       <button class="drawer-close" onclick="closeDrawer()">✕</button>
     </div>
     <div class="drawer-body" id="drawerBody">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+
+  <!-- History Drawer -->
+  <div class="drawer-overlay" id="historyOverlay" onclick="closeHistoryDrawer()"></div>
+  <div class="drawer" id="historyDrawer">
+    <div class="drawer-header">
+      <h2>Query History</h2>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="btn-export" onclick="clearHistory()" id="clearHistoryBtn" disabled>Clear</button>
+        <button class="drawer-close" onclick="closeHistoryDrawer()">&times;</button>
+      </div>
+    </div>
+    <div class="drawer-body" id="historyBody">
       <!-- Populated by JS -->
     </div>
   </div>
@@ -1356,6 +1374,71 @@
       document.getElementById('drawer').classList.remove('open');
     }
 
+    // ---- History Drawer ----
+    function openHistoryDrawer() {
+      populateHistoryDrawer();
+      document.getElementById('historyOverlay').classList.add('open');
+      document.getElementById('historyDrawer').classList.add('open');
+    }
+
+    function closeHistoryDrawer() {
+      document.getElementById('historyOverlay').classList.remove('open');
+      document.getElementById('historyDrawer').classList.remove('open');
+    }
+
+    function populateHistoryDrawer() {
+      const body = document.getElementById('historyBody');
+      const clearBtn = document.getElementById('clearHistoryBtn');
+
+      if (queryHistory.length === 0) {
+        body.innerHTML = `
+          <div class="state-message" style="height:auto;padding:40px 20px;">
+            <div class="icon" style="font-size:32px;">🕘</div>
+            <h3 style="font-size:14px;">No history yet</h3>
+            <p style="font-size:12px;">Queries you run will appear here.</p>
+          </div>`;
+        clearBtn.disabled = true;
+        return;
+      }
+
+      clearBtn.disabled = false;
+      let html = '';
+
+      // Show most recent first
+      for (let i = queryHistory.length - 1; i >= 0; i--) {
+        const entry = queryHistory[i];
+        const sql = typeof entry === 'object' ? entry.sql : entry;
+        const ts = typeof entry === 'object' && entry.ts
+          ? new Date(entry.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : '';
+        const preview = sql.replace(/\n/g, ' ').replace(/\s+/g, ' ').substring(0, 80) + (sql.length > 80 ? '\u2026' : '');
+        const num = queryHistory.length - i;
+        const escapedSql = JSON.stringify(sql).replace(/"/g, '&quot;');
+
+        html += `
+          <button class="starter-item" onclick="loadHistory(${escapedSql})" style="position:relative;">
+            <div class="starter-title" style="display:flex;justify-content:space-between;align-items:center;">
+              <span>#${num}</span>
+              ${ts ? `<span style="font-size:10px;font-weight:400;color:var(--text-muted);font-family:var(--font-mono);">${ts}</span>` : ''}
+            </div>
+            <div class="starter-sql">${escapeHtml(preview)}</div>
+          </button>`;
+      }
+
+      body.innerHTML = html;
+    }
+
+    function loadHistory(sql) {
+      editor.setValue(sql);
+      closeHistoryDrawer();
+      editor.focus();
+    }
+
+    function clearHistory() {
+      queryHistory = [];
+      populateHistoryDrawer();
+    }
+
     // ---- Resize Handle ----
     function initResize() {
       const handle = document.getElementById('resizeHandle');
@@ -1407,8 +1490,10 @@
     const origExecute = executeQuery;
     executeQuery = async function() {
       const sql = editor.getValue().trim();
-      if (sql && (queryHistory.length === 0 || queryHistory[queryHistory.length - 1] !== sql)) {
-        queryHistory.push(sql);
+      const lastEntry = queryHistory.length > 0 ? queryHistory[queryHistory.length - 1] : null;
+      const lastSql = lastEntry ? (typeof lastEntry === 'object' ? lastEntry.sql : lastEntry) : '';
+      if (sql && lastSql !== sql) {
+        queryHistory.push({ sql, ts: Date.now() });
         if (queryHistory.length > 50) queryHistory.shift();
       }
       return origExecute();
@@ -1418,6 +1503,7 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeDrawer();
+        closeHistoryDrawer();
         document.getElementById('aboutOverlay').classList.remove('open');
         document.getElementById('shortcutsOverlay').classList.remove('open');
       }
