@@ -1344,7 +1344,7 @@
         queries: [
           { title: 'GROUP BY', sql: 'select\n      grade_level\n    , count(*) as student_count\nfrom enrollments\nwhere schoolyear_id = 2026\ngroup by grade_level;' },
           { title: 'Grouping rule (error)', sql: 'select\n      grade_level\n    , school_id\n    , count(*) as student_count\nfrom enrollments\nwhere schoolyear_id = 2026\ngroup by grade_level;' },
-          { title: 'HAVING', sql: 'select\n      grade_level\n    , count(*) as student_count\nfrom enrollments\nwhere schoolyear_id = 2026\ngroup by grade_level\nhaving count(*) > 500;' },
+          { title: 'HAVING', sql: 'select\n      grade_level\n    , count(*) as student_count\nfrom enrollments\nwhere schoolyear_id = 2026\ngroup by grade_level\nhaving count(*) > 50;' },
           { title: 'WHERE + HAVING + ORDER BY', sql: 'select\n      school_id\n    , grade_level\n    , count(*) as student_count\nfrom enrollments\nwhere schoolyear_id = 2026\ngroup by school_id\n    , grade_level\nhaving count(*) > 200\norder by school_id\n    , grade_level;' },
           { title: 'Multi-field GROUP BY', sql: 'select\n      school_id\n    , grade_level\n    , count(*) as student_count\nfrom enrollments\nwhere schoolyear_id = 2026\ngroup by school_id\n    , grade_level\norder by school_id\n    , grade_level;' },
           { title: 'HAVING without WHERE', sql: 'select\n      grade_level\n    , count(*) as schoolyear_count\nfrom enrollments\ngroup by grade_level\nhaving count(*) > 5;' },
