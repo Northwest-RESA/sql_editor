@@ -1303,41 +1303,87 @@
       {
         group: 'Module 2 - Basic SELECT',
         queries: [
-          { title: 'View all schools', sql: 'SELECT *\nFROM schools;' },
-          { title: 'Student names and DOB', sql: 'SELECT\n  first_name\n  , last_name\n  , date_of_birth\nFROM students;' },
-          { title: 'Course catalog', sql: 'SELECT\n  course_code\n  , course_name\n  , subject_name\nFROM courses\nORDER BY course_name;' },
-          { title: 'Teacher directory', sql: 'SELECT\n  first_name || \' \' || last_name AS teacher_name\n  , email\n  , department\nFROM teachers;' },
+          { title: 'View all schools', sql: 'select *\nfrom schools;' },
+          { title: 'Specific fields', sql: 'select school_id, school_name, school_type, address, city, zip_code\nfrom schools;' },
+          { title: 'Expression', sql: "select school_id\n  , address\n  , city || ', ' || state || '  ' || zip_code\nfrom schools;" },
+          { title: 'Named expression', sql: "select school_id\n  , address\n  , city || ', ' || state || '  ' || zip_code as address_last_line\nfrom schools;" },
+          { title: 'Field alias', sql: "select school_id\n  , address\n  , city\n  , state\n  , zip_code as postal_code\nfrom schools;" },
         ]
       },
       {
-        group: 'Module 3 - Filtering & Sorting',
+        group: 'Module 3 - Sorting & Filtering',
         queries: [
-          { title: 'Grade 9 students', sql: 'SELECT\n  s.first_name\n  , s.last_name\n  , e.grade_level\nFROM enrollments e\nJOIN students s ON e.student_id = s.student_id\nWHERE e.grade_level = 9\n  AND e.schoolyear_id = 2026\nORDER BY s.last_name;' },
-          { title: 'Math courses', sql: 'SELECT\n  course_name\n  , course_code\nFROM courses\nWHERE course_name LIKE \'%Math%\'\nORDER BY course_name;' },
-          { title: 'Last names starting with S', sql: 'SELECT\n  first_name\n  , last_name\nFROM students\nWHERE last_name LIKE \'S%\'\nORDER BY last_name, first_name;' },
+          { title: 'WHERE equality', sql: 'select\n      first_name\n    , last_name\nfrom students\nwhere student_id = 1001;' },
+          { title: 'AND', sql: 'select\n      student_id\n    , grade_level\n    , school_id\nfrom enrollments\nwhere grade_level = 10\n  and schoolyear_id = 2026;' },
+          { title: 'OR', sql: 'select\n      student_id\n    , grade_level\nfrom enrollments\nwhere grade_level = 11\n   or grade_level = 12;' },
+          { title: 'IN', sql: 'select\n      student_id\n    , grade_level\nfrom enrollments\nwhere grade_level in (11, 12)\n  and schoolyear_id = 2026;' },
+          { title: 'LIKE (contains)', sql: "select\n      course_name\nfrom courses\nwhere course_name like '%Math%';" },
+          { title: 'LIKE (starts with)', sql: "select\n      first_name\n    , last_name\nfrom students\nwhere last_name like 'S%';" },
+          { title: 'ORDER BY', sql: "select\n      first_name\n    , last_name\nfrom students\nwhere last_name like 'S%'\norder by\n      last_name asc\n    , first_name asc;" },
+          { title: 'WHERE + ORDER BY', sql: 'select\n      student_id\n    , grade_level\nfrom enrollments\nwhere schoolyear_id = 2026\norder by grade_level desc;' },
         ]
       },
       {
         group: 'Module 4 - Aggregates',
         queries: [
-          { title: 'Count all students', sql: 'SELECT COUNT(*) AS total_students\nFROM students;' },
-          { title: 'Students per school (current year)', sql: 'SELECT\n  sc.school_name\n  , COUNT(e.student_id) AS student_count\nFROM enrollments e\nJOIN schools sc ON e.school_id = sc.school_id\nWHERE e.schoolyear_id = 2026\n  AND e.exit_date IS NULL\nGROUP BY sc.school_name\nORDER BY student_count DESC;' },
-          { title: 'Grade distribution', sql: 'SELECT\n  grade_level\n  , COUNT(*) AS student_count\nFROM enrollments\nWHERE schoolyear_id = 2026\n  AND exit_date IS NULL\nGROUP BY grade_level\nORDER BY grade_level;' },
+          { title: 'COUNT(*)', sql: 'select\n  count(*) as student_count\nfrom students;' },
+          { title: 'COUNT(field)', sql: 'select\n  count(exit_date) as exited_count\nfrom enrollments\nwhere schoolyear_id = 2026;' },
+          { title: 'SUM', sql: 'select\n  sum(credits) as total_credits\nfrom courses;' },
+          { title: 'AVG', sql: 'select\n  avg(credits) as avg_credits\nfrom courses;' },
+          { title: 'MIN and MAX', sql: 'select\n    min(entry_date) as earliest_entry\n  , max(entry_date) as latest_entry\nfrom enrollments\nwhere schoolyear_id = 2026;' },
+          { title: 'Multiple aggregates', sql: 'select\n    min(credits) as min_credits\n  , max(credits) as max_credits\n  , avg(credits) as avg_credits\nfrom courses;' },
+          { title: 'WHERE + COUNT', sql: 'select\n  count(*) as grade_10_count\nfrom enrollments\nwhere grade_level = 10\n  and schoolyear_id = 2026;' },
+          { title: 'WHERE + AVG', sql: 'select\n  avg(credits) as avg_credits\nfrom courses\nwhere grade_level_min >= 9;' },
+          { title: 'SELECT DISTINCT', sql: 'select distinct\n  grade_level\nfrom enrollments\nwhere schoolyear_id = 2026\norder by grade_level;' },
+          { title: 'COUNT(DISTINCT)', sql: 'select\n  count(distinct grade_level) as grade_level_count\nfrom enrollments\nwhere schoolyear_id = 2026;' },
+          { title: 'COUNT(DISTINCT) schools', sql: 'select\n  count(distinct school_id) as school_count\nfrom enrollments\nwhere schoolyear_id = 2026;' },
         ]
       },
       {
-        group: 'Module 6–7 - JOINs',
+        group: 'Module 5 - Grouping',
         queries: [
-          { title: 'Teacher schedule', sql: 'SELECT\n  sec.period\n  , c.course_name\n  , sec.grade_level\n  , sec.room_number\n  , COUNT(ss.student_id) AS enrollment\nFROM sections sec\nJOIN courses c ON sec.course_id = c.course_id\nLEFT JOIN student_sections ss ON sec.section_id = ss.section_id\nJOIN terms t ON sec.term_id = t.term_id\nWHERE sec.teacher_id = 702\n  AND t.schoolyear_id = 2026\nGROUP BY sec.period, c.course_name, sec.grade_level, sec.room_number\nORDER BY sec.period;' },
-          { title: 'Student roster for a section', sql: 'SELECT\n  st.student_id\n  , st.last_name\n  , st.first_name\n  , ss.grade\nFROM student_sections ss\nJOIN students st ON ss.student_id = st.student_id\nWHERE ss.section_id = 150\nORDER BY st.last_name, st.first_name;' },
-          { title: 'Courses with no sections', sql: 'SELECT\n  c.course_name\n  , c.course_code\nFROM courses c\nLEFT JOIN sections sec ON c.course_id = sec.course_id\nWHERE sec.section_id IS NULL\nORDER BY c.course_name;' },
+          { title: 'GROUP BY', sql: 'select\n      grade_level\n    , count(*) as student_count\nfrom enrollments\nwhere schoolyear_id = 2026\ngroup by grade_level;' },
+          { title: 'Grouping rule (error)', sql: 'select\n      grade_level\n    , school_id\n    , count(*) as student_count\nfrom enrollments\nwhere schoolyear_id = 2026\ngroup by grade_level;' },
+          { title: 'HAVING', sql: 'select\n      grade_level\n    , count(*) as student_count\nfrom enrollments\nwhere schoolyear_id = 2026\ngroup by grade_level\nhaving count(*) > 500;' },
+          { title: 'WHERE + HAVING + ORDER BY', sql: 'select\n      school_id\n    , grade_level\n    , count(*) as student_count\nfrom enrollments\nwhere schoolyear_id = 2026\ngroup by school_id\n    , grade_level\nhaving count(*) > 200\norder by school_id\n    , grade_level;' },
+          { title: 'Multi-field GROUP BY', sql: 'select\n      school_id\n    , grade_level\n    , count(*) as student_count\nfrom enrollments\nwhere schoolyear_id = 2026\ngroup by school_id\n    , grade_level\norder by school_id\n    , grade_level;' },
+          { title: 'HAVING without WHERE', sql: 'select\n      grade_level\n    , count(*) as schoolyear_count\nfrom enrollments\ngroup by grade_level\nhaving count(*) > 5;' },
+        ]
+      },
+      {
+        group: 'Module 6 - JOIN Introduction',
+        queries: [
+          { title: 'Cartesian product', sql: 'select\n      students.first_name\n    , students.last_name\n    , enrollments.grade_level\nfrom students, enrollments;' },
+          { title: 'Filtered cartesian', sql: 'select\n      students.first_name\n    , students.last_name\n    , enrollments.grade_level\nfrom students, enrollments\nwhere students.student_id = enrollments.student_id;' },
+          { title: 'Table aliases', sql: 'select\n      s.first_name\n    , s.last_name\n    , e.grade_level\nfrom students s, enrollments e\nwhere s.student_id = e.student_id;' },
+          { title: 'Ambiguous field (error)', sql: 'select\n      student_id\n    , first_name\n    , grade_level\nfrom students s, enrollments e\nwhere s.student_id = e.student_id;' },
+          { title: 'Disambiguated field', sql: 'select\n      s.student_id\n    , s.first_name\n    , e.grade_level\nfrom students s, enrollments e\nwhere s.student_id = e.student_id;' },
+        ]
+      },
+      {
+        group: 'Module 6 - INNER JOIN',
+        queries: [
+          { title: 'INNER JOIN', sql: 'select\n      students.first_name\n    , students.last_name\n    , enrollments.grade_level\n    , enrollments.school_id\nfrom students\ninner join enrollments\n  on students.student_id = enrollments.student_id;' },
+          { title: 'INNER JOIN with aliases', sql: 'select\n      s.first_name\n    , s.last_name\n    , e.grade_level\n    , e.school_id\nfrom students s\ninner join enrollments e\n  on s.student_id = e.student_id;' },
+          { title: 'JOIN + WHERE + ORDER BY', sql: 'select\n      s.first_name\n    , s.last_name\n    , e.grade_level\nfrom students s\ninner join enrollments e\n  on s.student_id = e.student_id\nwhere e.grade_level = 10\n  and e.schoolyear_id = 2026\norder by s.last_name asc;' },
+          { title: 'Schools + enrollments', sql: 'select\n      sc.school_name\n    , e.student_id\n    , e.grade_level\nfrom schools sc\ninner join enrollments e\n  on sc.school_id = e.school_id\nwhere e.schoolyear_id = 2026\norder by sc.school_name asc;' },
+        ]
+      },
+      {
+        group: 'Module 7 - JOIN Types',
+        queries: [
+          { title: 'LEFT JOIN', sql: 'select\n      s.student_id\n    , s.first_name\n    , s.last_name\n    , e.enrollment_id\n    , e.grade_level\nfrom students s\n  left join enrollments e\n    on s.student_id = e.student_id;' },
+          { title: 'Find missing (no enrollment)', sql: 'select\n      s.student_id\n    , s.first_name\n    , s.last_name\nfrom students s\n  left join enrollments e\n    on s.student_id = e.student_id\nwhere e.student_id is null;' },
+          { title: 'Courses with no sections', sql: 'select\n      c.course_id\n    , c.course_name\nfrom courses c\n  left join sections sec\n    on c.course_id = sec.course_id\nwhere sec.course_id is null;' },
+          { title: 'LEFT JOIN with ON condition', sql: 'select\n      t.teacher_id\n    , t.first_name\n    , t.last_name\n    , ts.school_id\nfrom teachers t\n  left join teacher_school ts\n    on t.teacher_id = ts.teacher_id\n   and ts.schoolyear_id = 2026;' },
+          { title: 'RIGHT JOIN', sql: 'select\n      s.first_name\n    , s.last_name\n    , e.enrollment_id\n    , e.grade_level\nfrom students s\n  right join enrollments e\n    on s.student_id = e.student_id;' },
         ]
       },
       {
         group: 'Explore the Schema',
         queries: [
-          { title: 'List all tables', sql: "SELECT\n  table_name\n  , table_type\nFROM information_schema.tables\nWHERE table_schema = 'public'\nORDER BY table_name;" },
-          { title: 'Columns in a table', sql: "SELECT\n  column_name\n  , data_type\n  , is_nullable\nFROM information_schema.columns\nWHERE table_schema = 'public'\n  AND table_name = 'students'\nORDER BY ordinal_position;" },
+          { title: 'List all tables', sql: "select\n      table_name\n    , table_type\nfrom information_schema.tables\nwhere table_schema = 'public'\norder by table_name;" },
+          { title: 'Fields in a table', sql: "select\n      column_name\n    , data_type\n    , is_nullable\nfrom information_schema.columns\nwhere table_schema = 'public'\n  and table_name = 'students'\norder by ordinal_position;" },
         ]
       }
     ];
